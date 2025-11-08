@@ -54,7 +54,7 @@ jobs:
       # 5. Instalação de Dependências
       - name: Install Python Dependencies
         run: |
-          pip install -r ./pipelines/requirements.txt
+          pip install -r ./pipelines/ingest_stock_api/requirements.txt
           pip install -r ./dbt/requirements.txt
           # Dependências adicionais para autenticação/GCS/BQ
           pip install google-cloud-bigquery google-cloud-storage gcsfs
