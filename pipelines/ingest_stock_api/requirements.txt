@@ -1,3 +1,7 @@
 requests
 google-cloud-bigquery
+google-cloud-storage
 python-dotenv
+pandas
+pyarrow
+gcsfs
