@@ -29,7 +29,7 @@ personal-data-lakehouse/
 │   └── process_crypto_pyspark/ # Outros scripts de processamento
 ├── .gitignore
 └── README.md                  # Documentação principal
-
+```
 
 ## 🛠️ Tecnologias Utilizadas
 
