@@ -1,0 +1,99 @@
+# .github/workflows/data_pipeline.yml
+name: Stock Lakehouse Daily Pipeline
+
+# 1. Gatilhos do Workflow
+on:
+  # Agendamento: Roda todos os dias à 01:00 UTC (ajuste o horário se necessário)
+  schedule:
+    - cron: '0 1 * * *'
+  # Gatilho manual: Permite rodar a qualquer momento e definir o modo
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Execution Mode (daily or rebuild)'
+        required: true
+        default: 'daily'
+
+# 2. Variáveis de Ambiente Globais
+env:
+  PROJECT_ID: personal-data-lakehouse
+  DBT_DIR: ./dbt/lakehouse_models
+  PYTHON_INGEST_PATH: ./pipelines/ingest_stock_api/main.py
+  # A chave da API é lida do segredo do GitHub
+  ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+
+jobs:
+  run_elt_pipeline:
+    runs-on: ubuntu-latest
+    
+    # Permissões necessárias para autenticação GCP (Workload Identity)
+    permissions:
+      contents: read
+      id-token: write 
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 3. Autenticação GCP
+      # Assinatura de um token com a Service Account do GCP
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v2'
+        with:
+          # ESTES VALORES DEVEM SER AJUSTADOS COM BASE NA SUA CONFIGURAÇÃO GCP
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-actions-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+
+      # 4. Configuração do Ambiente
+      - name: Set up Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # 5. Instalação de Dependências
+      - name: Install Python Dependencies
+        run: |
+          pip install -r ./pipelines/requirements.txt
+          pip install -r ./dbt/requirements.txt
+          # Dependências adicionais para autenticação/GCS/BQ
+          pip install google-cloud-bigquery google-cloud-storage gcsfs
+
+      # 6. TAREFA: Ingestão de Dados (Camada Bronze - Sempre TRUNCATE)
+      - name: Run Python Ingestion Script (Bronze)
+        run: python ${{ env.PYTHON_INGEST_PATH }}
+
+      # 7. TAREFA: Configura o flag --full-refresh
+      - name: Set DBT Refresh Flag
+        id: set_dbt_flag
+        run: |
+          REFRESH_FLAG=""
+          if [ "${{ github.event.inputs.mode }}" == "rebuild" ]; then
+            REFRESH_FLAG="--full-refresh"
+          fi
+          echo "dbt_flag=$REFRESH_FLAG" >> $GITHUB_OUTPUT
+
+      # 8. TAREFA: Executar dbt (Camada Silver)
+      - name: Run DBT Transformation (Silver)
+        run: |
+          # Cria o profiles.yml temporário para a execução no GitHub Runner
+          mkdir -p ~/.dbt
+          echo "lakehouse_models:" > ~/.dbt/profiles.yml
+          echo "  target: github" >> ~/.dbt/profiles.yml
+          echo "  outputs:" >> ~/.dbt/profiles.yml
+          echo "    github:" >> ~/.dbt/profiles.yml
+          echo "      type: bigquery" >> ~/.dbt/profiles.yml
+          echo "      method: oauth" >> ~/.dbt/profiles.yml
+          echo "      project: ${{ env.PROJECT_ID }}" >> ~/.dbt/profiles.yml
+          echo "      threads: 4" >> ~/.dbt/profiles.yml
+          echo "      location: US" >> ~/.dbt/profiles.yml
+          
+          # Executa o dbt no modo incremental ou full-refresh
+          cd ${{ env.DBT_DIR }}
+          dbt run ${{ steps.set_dbt_flag.outputs.dbt_flag }} --target github
+          
+      # 9. TAREFA: Testes de Qualidade
+      - name: Run DBT Tests
+        run: |
+          cd ${{ env.DBT_DIR }}
+          dbt test --target github

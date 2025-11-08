@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: stock_bronze # Nome lógico da fonte
+    schema: stock_bronze # O NOME REAL do dataset no BigQuery
+    tables:
+      - name: raw_stock_daily # O NOME REAL da tabela
+
+      
