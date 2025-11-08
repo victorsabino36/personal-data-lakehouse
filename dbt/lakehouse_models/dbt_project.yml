@@ -24,7 +24,9 @@ models:
     
     # Configuração específica para a pasta 'silver'
     silver:
-      +schema: "stock"  # Salva no dataset 'stock_silver'
-      +materialized: "table"  # Salva como tabela
+      +schema: "stock_silver"  # Salva no dataset 'stock_silver'
+      +materialized: "incremental"  
     
-    
+    gold:
+      +schema: "stock_gold"
+      +materialized: "incremental"

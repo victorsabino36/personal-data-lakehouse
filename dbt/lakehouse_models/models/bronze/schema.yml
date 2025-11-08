@@ -1,0 +1,7 @@
+version: 2
+
+sources:
+  - name: stock_bronze 
+    schema: personal_lake_stock_bronze # <--dataset no BigQuery
+    tables:
+      - name: raw_stock_daily # <-- Nome real da tabela no BigQuery

@@ -1,10 +1,9 @@
 {{ config(
     materialized='incremental',
     alias='daily_stocks',
-    unique_key=['ticker', 'date'],
+    unique_key=['sigla_empresa', 'data_pregao'], 
     on_schema_change='fail'
 ) }}
-
 SELECT 
     CAST(date AS DATE) AS data_pregao,
     ticker AS sigla_empresa,
@@ -29,7 +28,7 @@ WHERE
     --  Lógica que SÓ RODA no modo INCREMENTAL (sem o --full-refresh)
     {% if is_incremental() %}
     -- Compara a data de pregao do dado BRONZE com a data máxima já existente no SILVER ({{ this }})
-    AND CAST(date AS DATE), => (SELECT MAX(data_pregao) FROM {{ this }})
+    AND CAST(date AS DATE) >= (SELECT MAX(data_pregao) FROM {{ this }})
     {% endif %}
 
 

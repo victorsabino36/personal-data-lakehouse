@@ -18,7 +18,7 @@ on:
 env:
   PROJECT_ID: personal-data-lakehouse
   DBT_DIR: ./dbt/lakehouse_models
-  PYTHON_INGEST_PATH: ./pipelines/ingest_stock_api/main.py
+  PYTHON_INGEST_PATH: ./pipelines/ingest_stock_api/ingest_stocks.py
   # A chave da API é lida do segredo do GitHub
   ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
 
@@ -84,6 +84,7 @@ jobs:
           echo "    github:" >> ~/.dbt/profiles.yml
           echo "      type: bigquery" >> ~/.dbt/profiles.yml
           echo "      method: oauth" >> ~/.dbt/profiles.yml
+          echo "      dataset: personal_lake" >> ~/.dbt/profiles.yml
           echo "      project: ${{ env.PROJECT_ID }}" >> ~/.dbt/profiles.yml
           echo "      threads: 4" >> ~/.dbt/profiles.yml
           echo "      location: US" >> ~/.dbt/profiles.yml

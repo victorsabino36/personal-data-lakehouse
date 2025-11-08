@@ -9,7 +9,7 @@ import pandas as pd # <-- 1. Importa o pandas
 load_dotenv() 
 
 PROJECT_ID = "personal-data-lakehouse" 
-DATASET_ID = "stock_bronze" 
+DATASET_ID = "personal_lake_stock_bronze" 
 TABLE_ID = "raw_stock_daily"
 STOCK_TICKERS = ["IBM", "MSFT", "NVDA"]
 
