@@ -29,7 +29,7 @@ WHERE
     --  Lógica que SÓ RODA no modo INCREMENTAL (sem o --full-refresh)
     {% if is_incremental() %}
     -- Compara a data de pregao do dado BRONZE com a data máxima já existente no SILVER ({{ this }})
-    AND CAST(date AS DATE), => (SELECT MAX(data_pregao) FROM {{ this }})
+    AND CAST(date AS DATE) >= (SELECT MAX(data_pregao) FROM {{ this }})
     {% endif %}
 
 
