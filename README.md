@@ -24,9 +24,8 @@ personal-data-lakehouse/
 │       │   ├── silver/        # Modelos limpos e padronizados
 │       │   └── gold/          # Modelos agregados para BI (Data Marts)
 │       └── requirements.txt
-├── pipelines/                 # CÓDIGO DE INGESTÃO (ELT - E & L)
-│   ├── ingest_stock_api/      # Pipeline de ingestão da API Alpha Vantage
-│   └── process_crypto_pyspark/ # Outros scripts de processamento
+├── pipelines/                 # CÓDIGO DE INGESTÃO (ETL)
+│   
 ├── .gitignore
 └── README.md                  # Documentação principal
 ```
@@ -50,9 +49,9 @@ O pipeline garante a qualidade e a performance segregando os dados em camadas:
 
 | Camada | Dataset de Destino | Propósito | Materialização |
 | :--- | :--- | :--- | :--- |
-| **Bronze** | `stock_bronze` | Dados brutos, sem tratamento, mas formatados (Parquet no GCS). 
-| **Silver** | `stock_silver` | Dados limpos, com tipos e *timestamps* corrigidos. Base para transformações. 
-| **Gold** | `stock_gold` | Agregações de negócio (Ex: Resumo Mensal). Otimizado para BI e Análise. 
+| **Bronze** | `{}_bronze` | Dados brutos, sem tratamento, mas formatados (Parquet no GCS). 
+| **Silver** | `{}_silver` | Dados limpos, com tipos e *timestamps* corrigidos. Base para transformações. 
+| **Gold** | `{}_gold` | Agregações de negócio (Ex: Resumo Mensal). Otimizado para BI e Análise. 
 
 ---
 
