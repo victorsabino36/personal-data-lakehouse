@@ -84,7 +84,7 @@ jobs:
           echo "    github:" >> ~/.dbt/profiles.yml
           echo "      type: bigquery" >> ~/.dbt/profiles.yml
           echo "      method: oauth" >> ~/.dbt/profiles.yml
-          echo "      dataset: personal-lake-" >> ~/.dbt/profiles.yml
+          echo "      dataset: personal_lake" >> ~/.dbt/profiles.yml
           echo "      project: ${{ env.PROJECT_ID }}" >> ~/.dbt/profiles.yml
           echo "      threads: 4" >> ~/.dbt/profiles.yml
           echo "      location: US" >> ~/.dbt/profiles.yml
