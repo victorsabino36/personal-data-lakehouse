@@ -1,6 +1,6 @@
-# 📊 Personal Data Lakehouse: Pipeline ELT de Ações Financeiras
+# 📊 Personal Data Lakehouse: 
 
-Repositório contendo o projeto de **Engenharia de Dados** que implementa um *Data Lakehouse* completo na **Google Cloud Platform (GCP)**. O objetivo é demonstrar proficiência em arquitetura **ELT** (Extract, Load, Transform), modelagem **dbt** e automação de *pipelines* usando **GitHub Actions** (Infraestrutura como Código - IaC).
+Repositório contendo o projeto de **Engenharia de Dados** que implementa um *Data Lakehouse* completo na **Google Cloud Platform (GCP)**. O objetivo é demonstrar proficiência em arquitetura **ETL** (Extract,  Transform, Load), modelagem **dbt** e automação de *pipelines* usando **GitHub Actions** (Infraestrutura como Código - IaC).
 
 ---
 
