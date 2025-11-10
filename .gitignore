@@ -1,27 +1,36 @@
 # ==================================
+# SEGREDOS E CREDENCIAIS
+# ==================================
 # Ignora arquivos de variáveis de ambiente em QUALQUER pasta
 **/.env
 **/.env.*
-
 # Ignora credenciais de Cloud (AWS/GCP)
 **/credentials.json
-**/*.json
+
+# ==================================
+# DADOS E LOGS (CRÍTICO)
+# ==================================
+# Ignora QUALQUER pasta 'data' em QUALQUER lugar
+**/data/
+# Ignora QUALQUER arquivo .log em QUALQUER lugar
+**/*.log
 
 # ==================================
 # AMBIENTES VIRTUAIS PYTHON
 # ==================================
-# Ignora QUALQUER pasta venv/ ou .venv/ em QUALQUER lugar
 **/venv/
 **/.venv/
 
 # ==================================
-# CACHE DO PYTHON
+# CACHE (PYTHON & SPARK)
 # ==================================
 **/__pycache__/
 **/*.pyc
+# Cache de pacotes do Spark (ex: Delta)
+**/.ivy2.5.2/
 
 # ==================================
-# ARQUIVOS GERADOS PELO DBT (Regras Globais)
+# ARQUIVOS GERADOS PELO DBT
 # ==================================
 **/target/
 **/logs/
@@ -30,10 +39,10 @@
 # ==================================
 # ARQUIVOS GERADOS PELO AIRFLOW
 # ==================================
-airflow/plugins/
+**/airflow/plugins/
 
 # ==================================
 # ARQUIVOS DE SISTEMA
 # ==================================
-.DS_Store
-.vscode/
+**/.DS_Store
+**/.vscode/
