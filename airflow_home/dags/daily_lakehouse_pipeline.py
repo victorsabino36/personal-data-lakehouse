@@ -18,7 +18,7 @@ CRYPTO_SCRIPT_GCS_PATH = f"gs://{ARTIFACTS_BUCKET}/pipelines/process_crypto_pysp
 STOCKS_SCRIPT_GCS_PATH = f"gs://{ARTIFACTS_BUCKET}/pipelines/ingest_stock_api/ingest_stocks.py"
 
 # Pacotes PySpark necessários no Dataproc Serverless
-PYSPARK_PACKAGES = ["io.delta:delta-spark_2.12:3.2.0"]
+PYSPARK_PACKAGES = ["io.delta:delta-spark_2.13:3.2.0"]
 
 # Caminho do projeto dbt (mount automático do Composer)
 DBT_PROJECT_LOCAL_PATH = "/home/airflow/gcs/dags/dbt/lakehouse_models"
