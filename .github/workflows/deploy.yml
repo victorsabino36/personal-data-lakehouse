@@ -1,4 +1,3 @@
-# .github/workflows/deploy.yml (Versão final)
 name: CI/CD - Teste e Deploy para Cloud Composer
 
 on:
@@ -17,6 +16,9 @@ env:
   COMPOSER_DAGS_BUCKET: "gs://us-central1-personal-data-l-fed427c8-bucket/dags"
 
 jobs:
+  # ==========================================================
+  # TRABALHO 1: CI (Teste de Qualidade)
+  # ==========================================================
   test:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
@@ -26,36 +28,50 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        
       - name: Authenticate to Google Cloud
         uses: 'google-github-actions/auth@v2'
         with:
           workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-actions-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+
+      # ⚠️ IMPORTANTE: setup-gcloud ANTES de usar gcloud/gsutil
+      - name: Set up Cloud SDK (gcloud CLI)
+        uses: 'google-github-actions/setup-gcloud@v2'
+
       - name: Set up Python Environment
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
+          
       - name: Install dbt Dependencies
         run: pip install dbt-bigquery
+        
       - name: Setup dbt Profile (para testes)
         run: |
           mkdir -p ~/.dbt
-          echo "lakehouse_models:" > ~/.dbt/profiles.yml
-          echo "  target: github_ci" >> ~/.dbt/profiles.yml
-          echo "  outputs:" >> ~/.dbt/profiles.yml
-          echo "    github_ci:" >> ~/.dbt/profiles.yml
-          echo "      type: bigquery" >> ~/.dbt/profiles.yml
-          echo "      method: oauth" >> ~/.dbt/profiles.yml
-          echo "      dataset: personal_lake" >> ~/.dbt/profiles.yml
-          echo "      project: ${{ env.PROJECT_ID }}" >> ~/.dbt/profiles.yml
-          echo "      threads: 4" >> ~/.dbt/profiles.yml
-          echo "      location: US" >> ~/.dbt/profiles.yml
+          cat > ~/.dbt/profiles.yml << EOF
+          lakehouse_models:
+            target: github_ci
+            outputs:
+              github_ci:
+                type: bigquery
+                method: oauth
+                dataset: personal_lake
+                project: ${{ env.PROJECT_ID }}
+                threads: 4
+                location: US
+          EOF
+          
       - name: Run dbt build (Testa tudo)
         run: |
           cd ${{ env.DBT_DIR }}
           dbt build --target github_ci
 
+  # ==========================================================
+  # TRABALHO 2: CD (Deploy)
+  # ==========================================================
   deploy:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -65,20 +81,36 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        
       - name: Authenticate to Google Cloud
         uses: 'google-github-actions/auth@v2'
         with:
           workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-actions-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+
+      # ⚠️ CRÍTICO: Este step DEVE vir logo após a autenticação
+      - name: Set up Cloud SDK (gcloud CLI)
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      # ✅ Opcional mas recomendado: Verificar autenticação
+      - name: Verify Authentication
+        run: |
+          echo "🔐 Verificando autenticação..."
+          gcloud auth list
+          echo "📦 Testando acesso ao GCS..."
+          gsutil ls ${{ env.COMPOSER_DAGS_BUCKET }} || echo "❌ Falha ao acessar bucket"
+
       - name: Deploy DAGs para Cloud Composer
         run: |
-          echo "Copiando DAGs para o Composer..."
-          gsutil rsync -r airflow_home/dags/ ${{ env.COMPOSER_DAGS_BUCKET }}
+          echo "📤 Copiando DAGs para o Composer..."
+          gsutil -m rsync -r -d airflow_home/dags/ ${{ env.COMPOSER_DAGS_BUCKET }}
+          
       - name: Deploy Scripts PySpark para GCS
         run: |
-          echo "Copiando scripts PySpark para Artifacts..."
-          gsutil rsync -r -x "__pycache__|venv" pipelines/ ${{ env.ARTIFACTS_BUCKET }}/pipelines
-      - name: Deploy Projeto dbt para GCS (para acesso do Composer)
+          echo "📤 Copiando scripts PySpark para Artifacts..."
+          gsutil -m rsync -r -d -x "__pycache__|venv|*.pyc" pipelines/ ${{ env.ARTIFACTS_BUCKET }}/pipelines
+          
+      - name: Deploy Projeto dbt para GCS
         run: |
-          echo "Copiando projeto dbt para o bucket de DAGs do Composer..."
-          gsutil rsync -r -x "__pycache__|venv" dbt/ ${{ env.COMPOSER_DAGS_BUCKET }}/dbt
+          echo "📤 Copiando projeto dbt para o bucket de DAGs do Composer..."
+          gsutil -m rsync -r -d -x "__pycache__|venv|*.pyc|logs|target" dbt/ ${{ env.COMPOSER_DAGS_BUCKET }}/dbt
