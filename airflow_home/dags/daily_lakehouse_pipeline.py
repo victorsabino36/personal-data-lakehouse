@@ -31,12 +31,8 @@ echo "-----------------------------------"
 echo "Iniciando Task [dbt run - Silver + Gold]"
 echo "Pasta do Projeto dbt: {DBT_PROJECT_LOCAL_PATH}"
 echo "-----------------------------------"
-
 cd {DBT_PROJECT_LOCAL_PATH}
-
-RAW_KEY_JSON='{{{{ var.value.GCP_SA_KEYFILE_JSON }}}}'
-export DBT_GCP_KEYFILE=$(echo "$RAW_KEY_JSON" | tr -d '\\n')
-
+unset GOOGLE_APPLICATION_CREDENTIALS
 dbt run --profiles-dir .
 """
 
