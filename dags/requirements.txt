@@ -1,5 +1,0 @@
-dbt-bigquery
-google-cloud-storage
-pandas
-pyarrow
-gcsfs

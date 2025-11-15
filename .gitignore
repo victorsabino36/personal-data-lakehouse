@@ -1,23 +1,32 @@
 # ==================================
-# SEGREDOS E CREDENCIAIS
+# SEGREDOS E CREDENCIAIS (CRÍTICO)
 # ==================================
 # Ignora arquivos de variáveis de ambiente em QUALQUER pasta
 **/.env
 **/.env.*
+
 # Ignora credenciais de Cloud (AWS/GCP)
 **/credentials.json
 
+# !! CORREÇÃO IMPORTANTE !!
+# Ignora o SEU arquivo de conexão local do dbt
+
+dbt/lakehouse_models/profiles.yml
+
 # ==================================
-# DADOS E LOGS (CRÍTICO)
+# DADOS E LOGS
 # ==================================
 # Ignora QUALQUER pasta 'data' em QUALQUER lugar
 **/data/
+
 # Ignora QUALQUER arquivo .log em QUALQUER lugar
+# (Isso já cobre os logs do dbt e do Airflow)
 **/*.log
 
 # ==================================
 # AMBIENTES VIRTUAIS PYTHON
 # ==================================
+# Padrão glob '**/venv/' cobre todos os seus venvs
 **/venv/
 **/.venv/
 
@@ -26,23 +35,29 @@
 # ==================================
 **/__pycache__/
 **/*.pyc
-# Cache de pacotes do Spark (ex: Delta)
-**/.ivy2.5.2/
+
+# !! CORREÇÃO !!
+# A versão (2.5.2) pode mudar. Ignorar a pasta .ivy2 inteira é mais robusto.
+**/.ivy2/
 
 # ==================================
 # ARQUIVOS GERADOS PELO DBT
 # ==================================
 **/target/
-**/logs/
 **/dbt_packages/
+# A pasta 'logs/' do dbt já está coberta pela regra **/*.log acima
 
 # ==================================
 # ARQUIVOS GERADOS PELO AIRFLOW
 # ==================================
-**/airflow/plugins/
+
+airflow_home/airflow.db
+airflow_home/airflow.cfg
+airflow_home/webserver_config.py
+airflow_home/simple_auth_manager_passwords.json.generated
 
 # ==================================
-# ARQUIVOS DE SISTEMA
+# ARQUIVOS DE SISTEMA E IDE
 # ==================================
 **/.DS_Store
 **/.vscode/
