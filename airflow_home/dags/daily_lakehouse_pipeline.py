@@ -3,42 +3,39 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.standard.operators.bash import BashOperator
 
-# !! CORREÇÃO 1: Mudar o nome do Operador !!
-from airflow.providers.google.cloud.operators.dataproc import DataprocSubmitBatchOperator
+# Operador CORRETO para Dataproc Serverless (Batch)
+from airflow.providers.google.cloud.operators.dataproc import DataprocCreateBatchOperator
 
 # ============================================================================
 # CONSTANTES (Cloud-Native)
 # ============================================================================
 PROJECT_ID = "personal-data-lakehouse"
-GCP_REGION = "us-central1" # Região do seu Composer/Dataproc
+GCP_REGION = "us-central1"
 
-# Caminhos no GCS (Onde o GHA faz o deploy)
+# Caminhos no GCS (deploy feitos pelo GitHub Actions)
 ARTIFACTS_BUCKET = "personal-data-lakehouse-artifacts"
 CRYPTO_SCRIPT_GCS_PATH = f"gs://{ARTIFACTS_BUCKET}/pipelines/process_crypto_pyspark/ingest_crypto_bronze.py"
 STOCKS_SCRIPT_GCS_PATH = f"gs://{ARTIFACTS_BUCKET}/pipelines/ingest_stock_api/ingest_stocks.py"
 
-# Pacotes que o Dataproc Serverless precisa baixar
-# O GCS connector já é incluído por padrão no Dataproc Serverless
+# Pacotes PySpark necessários no Dataproc Serverless
 PYSPARK_PACKAGES = ["io.delta:delta-spark_2.12:3.2.0"]
 
-# Caminho local (NO WORKER DO COMPOSER) para o projeto dbt
+# Caminho do projeto dbt (mount automático do Composer)
 DBT_PROJECT_LOCAL_PATH = "/home/airflow/gcs/dags/dbt/lakehouse_models"
 
 # ============================================================================
-# COMANDOS BASH (Apenas dbt)
+# COMANDOS BASH (dbt)
 # ============================================================================
-
 CMD_RUN_DBT_MODELS = f"""
 echo "-----------------------------------"
-echo "Iniciando Task [dbt run (Silver + Gold)]"
+echo "Iniciando Task [dbt run - Silver + Gold]"
 echo "Pasta do Projeto dbt: {DBT_PROJECT_LOCAL_PATH}"
 echo "-----------------------------------"
-cd {DBT_PROJECT_LOCAL_PATH} && \
-echo "Executando dbt run..."
 
-# Puxa a chave JSON da Variável do Airflow e a exporta
+cd {DBT_PROJECT_LOCAL_PATH}
+
 RAW_KEY_JSON='{{{{ var.value.GCP_SA_KEYFILE_JSON }}}}'
-export DBT_GCP_KEYFILE=$(echo "$RAW_KEY_JSON" | tr -d '\n')
+export DBT_GCP_KEYFILE=$(echo "$RAW_KEY_JSON" | tr -d '\\n')
 
 dbt run --profiles-dir .
 """
@@ -55,17 +52,18 @@ default_args = {
 }
 
 with DAG(
-    dag_id='daily_lakehouse_pipeline_cloud', 
+    dag_id='daily_lakehouse_pipeline_cloud',
     default_args=default_args,
-    description='Pipeline Cloud-Native: Dataproc (PySpark) e Composer (dbt).',
+    description='Pipeline Cloud-Native: Dataproc (PySpark Serverless) + Composer (dbt).',
     schedule_interval='@daily',
     catchup=False,
     tags=['lakehouse', 'daily', 'gcp', 'dataproc', 'dbt'],
 ) as dag:
 
-    # Task 1: Ingestão de Criptomoedas (Dataproc)
-    # !! CORREÇÃO 2: Usar DataprocSubmitBatchOperator e a estrutura 'batch' !!
-    task_ingest_crypto = DataprocSubmitBatchOperator(
+    # ----------------------------------------------------------------------
+    # Task 1 — Ingestão de Criptomoedas (PySpark -> Bronze)
+    # ----------------------------------------------------------------------
+    task_ingest_crypto = DataprocCreateBatchOperator(
         task_id="ingest_crypto_bronze_dataproc",
         project_id=PROJECT_ID,
         region=GCP_REGION,
@@ -76,16 +74,16 @@ with DAG(
             },
             "runtime_config": {
                 "properties": {
-                    # Os pacotes são passados como 'properties'
                     "spark.jars.packages": ",".join(PYSPARK_PACKAGES)
                 }
             }
         }
     )
 
-    # Task 2: Ingestão de Ações (Dataproc)
-    # !! CORREÇÃO 2: Usar DataprocSubmitBatchOperator e a estrutura 'batch' !!
-    task_ingest_stocks = DataprocSubmitBatchOperator(
+    # ----------------------------------------------------------------------
+    # Task 2 — Ingestão de Ações (PySpark -> Bronze)
+    # ----------------------------------------------------------------------
+    task_ingest_stocks = DataprocCreateBatchOperator(
         task_id="ingest_stocks_bronze_dataproc",
         project_id=PROJECT_ID,
         region=GCP_REGION,
@@ -93,8 +91,7 @@ with DAG(
         batch={
             "pyspark_batch": {
                 "main_python_file_uri": STOCKS_SCRIPT_GCS_PATH,
-                # Os argumentos são passados dentro do 'pyspark_batch'
-                "args": ["{{ var.value.ALPHA_VANTAGE_API_KEY }}"]
+                "args": ["{{ var.value.ALPHA_VANTAGE_API_KEY }}"],
             },
             "runtime_config": {
                 "properties": {
@@ -104,12 +101,16 @@ with DAG(
         }
     )
 
-    # Task 3: Rodar todos os modelos dbt (Bash)
+    # ----------------------------------------------------------------------
+    # Task 3 — Rodar modelos dbt (Silver + Gold)
+    # ----------------------------------------------------------------------
     task_run_dbt = BashOperator(
         task_id='run_dbt_models',
         bash_command=CMD_RUN_DBT_MODELS,
     )
 
-    # --- 5. Definindo as Dependências ---
+    # ----------------------------------------------------------------------
+    # Dependências
+    # Crypto roda em paralelo, Stocks precisa terminar → dbt roda depois
+    # ----------------------------------------------------------------------
     task_ingest_stocks >> task_run_dbt
-    # task_ingest_crypto (roda em paralelo)
