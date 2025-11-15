@@ -1,2 +1,3 @@
 pyspark
-boto3  # (Para o PySpark se conectar ao S3)
+requests
+delta-spark
