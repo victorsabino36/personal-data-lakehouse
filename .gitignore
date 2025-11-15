@@ -8,8 +8,6 @@
 # Ignora credenciais de Cloud (AWS/GCP)
 **/credentials.json
 
-# !! CORREÇÃO IMPORTANTE !!
-# Ignora o SEU arquivo de conexão local do dbt
 
 dbt/lakehouse_models/profiles.yml
 
@@ -36,7 +34,6 @@ dbt/lakehouse_models/profiles.yml
 **/__pycache__/
 **/*.pyc
 
-# !! CORREÇÃO !!
 # A versão (2.5.2) pode mudar. Ignorar a pasta .ivy2 inteira é mais robusto.
 **/.ivy2/
 
@@ -45,12 +42,16 @@ dbt/lakehouse_models/profiles.yml
 # ==================================
 **/target/
 **/dbt_packages/
-# A pasta 'logs/' do dbt já está coberta pela regra **/*.log acima
+dbt/lakehouse_models/.user.yml
+
 
 # ==================================
 # ARQUIVOS GERADOS PELO AIRFLOW
 # ==================================
 
+
+airflow_home/airflow.db-shm
+airflow_home/airflow.db-wal
 airflow_home/airflow.db
 airflow_home/airflow.cfg
 airflow_home/webserver_config.py
