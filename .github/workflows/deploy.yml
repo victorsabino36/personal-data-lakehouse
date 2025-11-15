@@ -88,29 +88,33 @@ jobs:
           workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-actions-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
 
-      # ⚠️ CRÍTICO: Este step DEVE vir logo após a autenticação
+      # CRÍTICO: Este step DEVE vir logo após a autenticação
       - name: Set up Cloud SDK (gcloud CLI)
         uses: 'google-github-actions/setup-gcloud@v2'
 
-      # ✅ Opcional mas recomendado: Verificar autenticação
+      #  Opcional mas recomendado: Verificar autenticação
       - name: Verify Authentication
         run: |
           echo "🔐 Verificando autenticação..."
           gcloud auth list
-          echo "📦 Testando acesso ao GCS..."
+          echo " Testando acesso ao GCS..."
           gsutil ls ${{ env.COMPOSER_DAGS_BUCKET }} || echo "❌ Falha ao acessar bucket"
 
       - name: Deploy DAGs para Cloud Composer
         run: |
-          echo "📤 Copiando DAGs para o Composer..."
+          echo " Copiando DAGs para o Composer..."
           gsutil -m rsync -r -d airflow_home/dags/ ${{ env.COMPOSER_DAGS_BUCKET }}
           
       - name: Deploy Scripts PySpark para GCS
         run: |
-          echo "📤 Copiando scripts PySpark para Artifacts..."
-          gsutil -m rsync -r -d -x "__pycache__|venv|*.pyc" pipelines/ ${{ env.ARTIFACTS_BUCKET }}/pipelines
+          echo " Copiando scripts PySpark para Artifacts..."
+          gsutil -m rsync -r -d \
+            -x '.*__pycache__.*|.*\.pyc$|.*/venv/.*' \
+            pipelines/ ${{ env.ARTIFACTS_BUCKET }}/pipelines
           
       - name: Deploy Projeto dbt para GCS
         run: |
-          echo "📤 Copiando projeto dbt para o bucket de DAGs do Composer..."
-          gsutil -m rsync -r -d -x "__pycache__|venv|*.pyc|logs|target" dbt/ ${{ env.COMPOSER_DAGS_BUCKET }}/dbt
+          echo " Copiando projeto dbt para o bucket de DAGs do Composer..."
+          gsutil -m rsync -r -d \
+            -x '.*__pycache__.*|.*\.pyc$|.*/venv/.*|.*/logs/.*|.*/target/.*' \
+            dbt/ ${{ env.COMPOSER_DAGS_BUCKET }}/dbt
