@@ -2,93 +2,95 @@ import os
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.standard.operators.bash import BashOperator
+from airflow.providers.google.cloud.operators.dataproc import DataprocSubmitPySparkJobOperator
 
-# --- 1. Definição de Caminhos ---
-DAG_FILE_PATH = os.path.abspath(__file__)
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(DAG_FILE_PATH)))
+# ============================================================================
+# CONSTANTES (Cloud-Native)
+# ============================================================================
+PROJECT_ID = "personal-data-lakehouse"
+GCP_REGION = "us-central1" # Região do seu Composer/Dataproc
 
+# Caminhos no GCS (Onde o GHA faz o deploy)
+ARTIFACTS_BUCKET = "personal-data-lakehouse-artifacts"
+CRYPTO_SCRIPT_GCS_PATH = f"gs://{ARTIFACTS_BUCKET}/pipelines/process_crypto_pyspark/ingest_crypto_bronze.py"
+STOCKS_SCRIPT_GCS_PATH = f"gs://{ARTIFACTS_BUCKET}/pipelines/ingest_stock_api/ingest_stocks.py"
 
-# --- 2. Caminhos para os Scripts e Projetos ---
-CRYPTO_SCRIPT_PATH = os.path.join(PROJECT_ROOT, 'pipelines', 'process_crypto_pyspark')
-STOCKS_SCRIPT_PATH = os.path.join(PROJECT_ROOT, 'pipelines', 'ingest_stock_api') 
-DBT_PROJECT_PATH = os.path.join(PROJECT_ROOT, 'dbt', 'lakehouse_models') # Caminho correto do projeto dbt
+# Pacotes que o Dataproc Serverless precisa baixar
+PYSPARK_PACKAGES = ["io.delta:delta-spark_2.12:3.2.0"]
 
+# Caminho local (NO WORKER DO COMPOSER) para o projeto dbt
+# O GHA copiou o projeto para 'gs://.../dags/dbt'
+# O Composer monta esse bucket em '/home/airflow/gcs/dags/'
+DBT_PROJECT_LOCAL_PATH = "/home/airflow/gcs/dags/dbt/lakehouse_models"
 
-# --- Caminhos dos VENVs ---
-PYSPARK_VENV_ACTIVATE = os.path.join(PROJECT_ROOT, 'pipelines', 'process_crypto_pyspark', 'venv', 'bin', 'activate')
-STOCK_VENV_ACTIVATE = os.path.join(PROJECT_ROOT, 'pipelines', 'ingest_stock_api', 'venv', 'bin', 'activate')
-DBT_VENV_ACTIVATE = os.path.join(PROJECT_ROOT, 'dbt', 'venv', 'bin', 'activate')
+# ============================================================================
+# COMANDOS BASH (Apenas dbt)
+# ============================================================================
 
-
-# --- 3. Comandos Bash para cada Tarefa ---
-
-# Task 1: Ingestão de Cripto (PySpark)
-CMD_INGEST_CRYPTO = f"""
-echo "-----------------------------------"
-echo "Iniciando Task [Ingestão Cripto Bronze]"
-echo "Ativando VENV em: {PYSPARK_VENV_ACTIVATE}"
-echo "-----------------------------------"
-cd {CRYPTO_SCRIPT_PATH} && \
-source {PYSPARK_VENV_ACTIVATE} && \
-python ingest_crypto_bronze.py
-"""
-
-# Task 2: Ingestão de Ações (PySpark)
-CMD_INGEST_STOCKS = f"""
-echo "-----------------------------------"
-echo "Iniciando Task [Ingestão Ações Bronze]"
-export ALPHA_VANTAGE_API_KEY="{{{{ var.value.ALPHA_VANTAGE_API_KEY }}}}"
-echo "Ativando VENV em: {STOCK_VENV_ACTIVATE}"
-echo "-----------------------------------"
-cd {STOCKS_SCRIPT_PATH} && \
-source {STOCK_VENV_ACTIVATE} && \
-python ingest_stocks.py 
-"""
-
-
-# RODA O DBT
+# Comando para rodar o dbt
 CMD_RUN_DBT_MODELS = f"""
 echo "-----------------------------------"
-echo "Rodando dbt com OAuth (ADC)"
-export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_credentials.json"
-cd {DBT_PROJECT_PATH} && \
-source {DBT_VENV_ACTIVATE} && \
+echo "Iniciando Task [dbt run (Silver + Gold)]"
+echo "Pasta do Projeto dbt: {DBT_PROJECT_LOCAL_PATH}"
+echo "-----------------------------------"
+
+# 1. 'cd' para a pasta do projeto dbt
+cd {DBT_PROJECT_LOCAL_PATH} && \
+
+echo "Executando dbt run..."
+# 2. Executa dbt run
+# (O profiles.yml está na pasta do projeto e usa 'service_account_json')
+# (A Key 'DBT_GCP_KEYFILE' será lida das Variáveis do Airflow)
 dbt run --profiles-dir .
 """
 
-
-
-# --- 4. Definição da DAG ---
+# ============================================================================
+# DEFINIÇÃO DA DAG
+# ============================================================================
 default_args = {
     'owner': 'VictorSabino',
     'depends_on_past': False,
     'start_date': datetime(2025, 11, 15),
     'retries': 1,
-    'retry_delay': timedelta(minutes=3),
+    'retry_delay': timedelta(minutes=5),
 }
 
 with DAG(
-    dag_id='daily_lakehouse_pipeline',
+    dag_id='daily_lakehouse_pipeline_cloud', # Novo nome
     default_args=default_args,
-    description='Pipeline diária: Ingestão (PySpark) e Transformação (dbt).',
-    schedule='@daily',
+    description='Pipeline Cloud-Native: Dataproc (PySpark) e Composer (dbt).',
+    schedule_interval='@daily',
     catchup=False,
-    tags=['lakehouse', 'daily', 'stocks', 'crypto', 'dbt'],
+    tags=['lakehouse', 'daily', 'gcp', 'dataproc', 'dbt'],
 ) as dag:
 
-    # Task 1: Ingestão de Criptomoedas (PySpark)
-    task_ingest_crypto = BashOperator(
-        task_id='ingest_crypto_bronze',
-        bash_command=CMD_INGEST_CRYPTO,
+    # Task 1: Ingestão de Criptomoedas (Dataproc)
+    task_ingest_crypto = DataprocSubmitPySparkJobOperator(
+        task_id='ingest_crypto_bronze_dataproc',
+        main=CRYPTO_SCRIPT_GCS_PATH,
+        project_id=PROJECT_ID,
+        region=GCP_REGION,
+        gcp_conn_id="google_cloud_default", 
+        dataproc_jars_in_spark_conf=True, 
+        dataproc_spark_packages=PYSPARK_PACKAGES 
     )
 
-    # Task 2: Ingestão de Ações (PySpark)
-    task_ingest_stocks = BashOperator(
-        task_id='ingest_stocks_bronze',
-        bash_command=CMD_INGEST_STOCKS,
+    # Task 2: Ingestão de Ações (Dataproc)
+    task_ingest_stocks = DataprocSubmitPySparkJobOperator(
+        task_id='ingest_stocks_bronze_dataproc',
+        main=STOCKS_SCRIPT_GCS_PATH,
+        project_id=PROJECT_ID,
+        region=GCP_REGION,
+        gcp_conn_id="google_cloud_default",
+        dataproc_jars_in_spark_conf=True,
+        dataproc_spark_packages=PYSPARK_PACKAGES,
+        # Passa a API Key (lida das Variáveis do Airflow) como argumento
+        # para o script (sys.argv[1])
+        pyfiles_uris=[],
+        args=["{{ var.value.ALPHA_VANTAGE_API_KEY }}"] 
     )
 
-    # Task 3: Rodar todos os modelos dbt
+    # Task 3: Rodar todos os modelos dbt (Bash)
     task_run_dbt = BashOperator(
         task_id='run_dbt_models',
         bash_command=CMD_RUN_DBT_MODELS,

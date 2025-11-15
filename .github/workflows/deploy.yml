@@ -1,0 +1,84 @@
+# .github/workflows/deploy.yml (Versão final)
+name: CI/CD - Teste e Deploy para Cloud Composer
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: personal-data-lakehouse
+  DBT_DIR: ./dbt/lakehouse_models
+  ARTIFACTS_BUCKET: gs://personal-data-lakehouse-artifacts
+  COMPOSER_DAGS_BUCKET: "gs://us-central1-personal-data-l-fed427c8-bucket/dags"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      id-token: write 
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-actions-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+      - name: Set up Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install dbt Dependencies
+        run: pip install dbt-bigquery
+      - name: Setup dbt Profile (para testes)
+        run: |
+          mkdir -p ~/.dbt
+          echo "lakehouse_models:" > ~/.dbt/profiles.yml
+          echo "  target: github_ci" >> ~/.dbt/profiles.yml
+          echo "  outputs:" >> ~/.dbt/profiles.yml
+          echo "    github_ci:" >> ~/.dbt/profiles.yml
+          echo "      type: bigquery" >> ~/.dbt/profiles.yml
+          echo "      method: oauth" >> ~/.dbt/profiles.yml
+          echo "      dataset: personal_lake" >> ~/.dbt/profiles.yml
+          echo "      project: ${{ env.PROJECT_ID }}" >> ~/.dbt/profiles.yml
+          echo "      threads: 4" >> ~/.dbt/profiles.yml
+          echo "      location: US" >> ~/.dbt/profiles.yml
+      - name: Run dbt build (Testa tudo)
+        run: |
+          cd ${{ env.DBT_DIR }}
+          dbt build --target github_ci
+
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write 
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-actions-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+      - name: Deploy DAGs para Cloud Composer
+        run: |
+          echo "Copiando DAGs para o Composer..."
+          gsutil rsync -r airflow_home/dags/ ${{ env.COMPOSER_DAGS_BUCKET }}
+      - name: Deploy Scripts PySpark para GCS
+        run: |
+          echo "Copiando scripts PySpark para Artifacts..."
+          gsutil rsync -r -x "__pycache__|venv" pipelines/ ${{ env.ARTIFACTS_BUCKET }}/pipelines
+      - name: Deploy Projeto dbt para GCS (para acesso do Composer)
+        run: |
+          echo "Copiando projeto dbt para o bucket de DAGs do Composer..."
+          gsutil rsync -r -x "__pycache__|venv" dbt/ ${{ env.COMPOSER_DAGS_BUCKET }}/dbt
