@@ -2,8 +2,7 @@ import os
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.standard.operators.bash import BashOperator
-from airflow.providers.google.cloud.operators.dataproc import DataprocSubmitPySparkJobOperator
-
+from airflow.providers.google.cloud.operators.dataproc import DataprocSubmitPySparkBatchOperator
 # ============================================================================
 # CONSTANTES (Cloud-Native)
 # ============================================================================
