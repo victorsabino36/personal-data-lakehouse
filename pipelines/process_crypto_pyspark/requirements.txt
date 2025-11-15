@@ -1,3 +1,8 @@
-pyspark
-requests
-delta-spark
+pyspark==3.3.2
+delta-spark==2.2.0
+pandas==2.1.4
+numpy==1.26.4
+requests==2.31.0
+python-dotenv==1.0.1
+pyarrow==14.0.1
+py4j==0.10.9.5

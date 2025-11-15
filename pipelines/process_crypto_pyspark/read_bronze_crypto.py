@@ -11,6 +11,8 @@ from delta import *
 # Caminho de onde os dados foram salvos
 BRONZE_PATH = "data/bronze/crypto_markets"
 
+
+
 def main():
     print("Iniciando leitor da Camada Bronze (3 moedas)...")
 
@@ -39,7 +41,7 @@ def main():
     
     # Usamos vertical=True para uma visualização limpa no terminal
     df.show(truncate=False, vertical=True)
-
+    
     spark.stop()
 
 if __name__ == "__main__":
