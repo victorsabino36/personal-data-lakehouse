@@ -1,0 +1,9 @@
+lakehouse_models:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth  
+      project: personal-data-lakehouse
+      dataset: silver
+      location: US
