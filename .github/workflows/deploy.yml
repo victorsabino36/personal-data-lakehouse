@@ -67,7 +67,7 @@ jobs:
       - name: Run dbt build (Testa tudo)
         run: |
           cd ${{ env.DBT_DIR }}
-          dbt build --target github_ci
+          dbt build --target dev
 
   # ==========================================================
   # TRABALHO 2: CD (Deploy)

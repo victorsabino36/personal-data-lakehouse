@@ -32,7 +32,6 @@ echo "Iniciando Task [dbt run - Silver + Gold]"
 echo "Pasta do Projeto dbt: {DBT_PROJECT_LOCAL_PATH}"
 echo "-----------------------------------"
 cd {DBT_PROJECT_LOCAL_PATH}
-unset GOOGLE_APPLICATION_CREDENTIALS
 dbt run --profiles-dir .
 """
 

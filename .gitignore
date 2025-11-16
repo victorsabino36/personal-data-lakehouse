@@ -9,8 +9,6 @@
 **/credentials.json
 
 
-dbt/lakehouse_models/profiles.yml
-
 # ==================================
 # DADOS E LOGS
 # ==================================
