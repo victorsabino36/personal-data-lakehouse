@@ -1,0 +1,68 @@
+# docker-compose.yaml (Dentro de airflow_home/)
+# Configuração para desenvolvimento local do Airflow com autenticação ADC/Google Cloud
+
+version: '3.7'
+x-airflow-common:
+  # Mapeamentos de volumes:
+  &airflow-common
+  volumes:
+    - ./dags:/opt/airflow/dags # 1. Suas DAGs Python
+    - ../dbt:/opt/airflow/dags/dbt # 2. Mapeamento do projeto dbt (pasta externa)
+    - ./logs:/opt/airflow/logs # 3. Logs do Airflow
+
+    # 4. Mapeamento das credenciais ADC do seu HOST para o contêiner
+    # Isso permite que o Airflow use o 'gcloud auth application-default login'
+    - /Users/victorsabino36/.config/gcloud/application_default_credentials.json:/opt/airflow/gcp_adc.json:ro
+
+    - ./airflow.cfg:/opt/airflow/airflow.cfg
+
+  environment:
+    # Configura o Airflow para procurar o token ADC no caminho mapeado
+    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp_adc.json
+
+    # Configuração Padrão do Airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__WEBSERVER__SECRET_KEY: seu_segredo_super_secreto_aqui
+
+    # Garante que o usuário Airflow tenha as permissões corretas
+    AIRFLOW_UID: 50000
+
+  user: "${AIRFLOW_UID:-50000}:0"
+
+services:
+  postgres:
+    image: postgres:13
+    container_name: airflow_postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
+
+  airflow-webserver:
+    # Usa o Dockerfile.airflow que criamos
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
+    container_name: airflow_webserver
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+
+  airflow-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
+    container_name: airflow_scheduler
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      - airflow-webserver
+      - postgres
