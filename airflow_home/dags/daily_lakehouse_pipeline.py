@@ -1,7 +1,10 @@
 import os
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.providers.google.cloud.operators.cloud_run import CloudRunCreateJobOperator
+from airflow.providers.google.cloud.operators.cloud_run import (
+    CloudRunExecuteJobOperator,
+    CloudRunUpdateJobOperator
+)
 from airflow.providers.google.cloud.operators.dataproc import DataprocCreateBatchOperator
 from airflow.operators.bash import BashOperator
 
@@ -91,27 +94,22 @@ with DAG(
     )
 
 
-    # TASK 3 - dbt tests
 
+    # ============================================================
+    # TASK 3- Executar Job do Cloud Run
+    # ============================================================
 
-    # TASK 4 - dbt transformation in Cloud Run
-    task_run_dbt = CloudRunCreateJobOperator(
+    task_run_dbt = CloudRunExecuteJobOperator(
         task_id="run_dbt_models_cloud_run",
         project_id=PROJECT_ID,
         region=GCP_REGION,
+        job_name="dbt-runner",
         gcp_conn_id="google_cloud_default",
-        job_name=DBT_JOB_NAME,
-        job={
-            "template": {
-                "template": {
-                    "containers": [{
-                        "image": f"gcr.io/{PROJECT_ID}/dbt_runner:latest",
-                        "args": ["run", "--profiles-dir", "/usr/app"], 
-                    }],
-                    "serviceAccount": DATAPROC_SERVICE_ACCOUNT
-                }
-            }
-        }
+        deferrable=False,
     )
+
+    # ============================================================
+    # DEPENDÊNCIAS
+    # ============================================================
 
     [task_ingest_crypto, task_ingest_stocks] >> task_run_dbt
