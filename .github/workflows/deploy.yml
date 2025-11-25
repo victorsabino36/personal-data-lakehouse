@@ -32,13 +32,13 @@ jobs:
 
     steps:
       # -------------------------
-      # 1) Checkout do código
+      # 0) Checkout do código
       # -------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # -------------------------
-      # 2) Autenticação no GCP
+      # 1) Autenticação no GCP
       # -------------------------
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -49,6 +49,18 @@ jobs:
       
       - name: Configure gcloud
         uses: google-github-actions/setup-gcloud@v2
+
+
+      # ---------------------------------------------------------
+      # 2) atualizar script de ingestão
+
+      - name: Deploy Scripts PySpark para GCS
+        run: |
+          echo " Copiando scripts PySpark para Artifacts..."
+          gsutil -m rsync -r -d \
+          -x '.*__pycache__.*|.*\.pyc$|.*/venv/.*' \
+          "pipelines/" \
+          "${{ env.ARTIFACTS_BUCKET }}/pipelines"
 
       # -------------------------
       # 3) Configurar Docker para Artifact Registry
@@ -86,3 +98,5 @@ jobs:
             --image "$AR_IMAGE_PATH:latest" \
             --region="${{ env.REGION }}" \
             --project="${{ env.PROJECT_ID }}"
+
+      # ==========================================================
