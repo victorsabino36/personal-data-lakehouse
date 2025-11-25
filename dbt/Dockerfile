@@ -8,6 +8,6 @@ RUN pip install dbt-bigquery
 WORKDIR /usr/app
 
 # Copia da subpasta lakehouse_models
-COPY lakehouse_models/ /usr/app/
+COPY lakehouse_models/ .
 
 ENTRYPOINT [ "dbt" ]
