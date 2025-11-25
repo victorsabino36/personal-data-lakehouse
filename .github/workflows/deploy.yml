@@ -82,7 +82,7 @@ jobs:
       # ---------------------------------------------------------
       - name: Deploy Cloud Run Job
         run: |
-          gcloud run jobs update dbt-runner-job \
+          gcloud run jobs update dbt-transformation-job \
             --image "$AR_IMAGE_PATH:latest" \
             --region="${{ env.REGION }}" \
             --project="${{ env.PROJECT_ID }}"
