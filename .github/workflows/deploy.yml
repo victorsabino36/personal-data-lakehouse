@@ -68,7 +68,7 @@ jobs:
       # ---------------------------------------------------------
       - name: Build Docker Image
         run: |
-          docker build -t "$AR_IMAGE_PATH:latest" .
+          docker build -t "$AR_IMAGE_PATH:latest" ./dbt
 
       # ---------------------------------------------------------
       # 6) Push para o Artifact Registry
