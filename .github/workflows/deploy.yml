@@ -1,121 +1,116 @@
-name: CI/CD - Teste e Deploy para Cloud Composer
+name: CD - Data Lakehouse Pipeline (Somente Deploy)
 
 on:
   push:
     branches:
-      - main
+      - *
   pull_request:
     branches:
-      - main
+      - *
   workflow_dispatch:
 
 env:
   PROJECT_ID: personal-data-lakehouse
+  REGION: us-central1
   DBT_DIR: ./dbt/lakehouse_models
+  AR_REPO_NAME: data-lakehouse-repo
+  IMAGE_NAME: dbt_runner
+
+  # Caminho completo da imagem no Artifact Registry (AR)
+  AR_IMAGE_PATH: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO_NAME }}/${{ env.IMAGE_NAME }}
+
+  # Bucket de Infraestrutura para scripts de pipelines
   ARTIFACTS_BUCKET: gs://personal-data-lakehouse-artifacts
-  COMPOSER_DAGS_BUCKET: "gs://us-central1-personal-data-l-fed427c8-bucket/dags"
+
+  # Service Account usada para a Workload Identity
+  SA_EMAIL: github-actions-sa@personal-data-lakehouse.iam.gserviceaccount.com
+
 
 jobs:
+
   # ==========================================================
-  # TRABALHO 1: CI (Teste de Qualidade)
+  # TRABALHO 1: CD - Build & Deploy da Imagem dbt
+  # Objetivo: Construir o Dockerfile, enviar para o AR e atualizar o Cloud Run Job.
   # ==========================================================
-  test:
+  build_and_deploy_image:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    if: github.event_name == 'push'
     permissions:
       contents: read
-      id-token: write 
+      id-token: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        
+
       - name: Authenticate to Google Cloud
         uses: 'google-github-actions/auth@v2'
         with:
+          service_account: ${{ env.SA_EMAIL }}
+          # Configura a Workload Identity Federation (WIF)
           workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-          service_account: github-actions-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
 
-      # MPORTANTE: setup-gcloud ANTES de usar gcloud/gsutil
-      - name: Set up Cloud SDK (gcloud CLI)
+      # Configura o gcloud CLI para comandos subsequentes
+      - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
 
-      - name: Set up Python Environment
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-          
-      - name: Install dbt Dependencies
-        run: pip install dbt-bigquery
-        
-      - name: Setup dbt Profile (para testes)
+      # Configura o Docker CLI para usar as credenciais gcloud (AR)
+      - name: Configure Docker to Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build Docker Image
+        # Constrói a imagem Docker baseada no Dockerfile dentro do subdiretorio 'dbt'.
         run: |
-          mkdir -p ~/.dbt
-          cat > ~/.dbt/profiles.yml << EOF
-          lakehouse_models:
-            target: github_ci
-            outputs:
-              github_ci:
-                type: bigquery
-                method: oauth
-                dataset: personal_lake
-                project: ${{ env.PROJECT_ID }}
-                threads: 4
-                location: US
-          EOF
-          
-      - name: Run dbt build (Testa tudo)
+          export IMAGE_TAG="${{ github.sha }}"
+          docker build ./dbt \
+            -t ${{ env.AR_IMAGE_PATH }}:${{ IMAGE_TAG }}
+
+      - name: Push Docker Image to Artifact Registry
+        # Envia a imagem para o AR (Artifact Registry) na regiao definida.
         run: |
-          cd ${{ env.DBT_DIR }}
-          dbt build --target dev
+          export IMAGE_TAG="${{ github.sha }}"
+          docker push ${{ env.AR_IMAGE_PATH }}:${{ IMAGE_TAG }}
+
+      - name: Deploy Image to Cloud Run Job
+        # Atualiza a definicao do Cloud Run Job para usar o novo tag (SHA do commit), garantindo rastreabilidade.
+        run: |
+          export IMAGE_TAG="${{ github.sha }}"
+          gcloud run jobs update dbt-transformation-job \
+            --image ${{ env.AR_IMAGE_PATH }}:${{ IMAGE_TAG }} \
+            --region ${{ env.REGION }} \
+            --service-account ${{ env.SA_EMAIL }} \
+            --command "dbt" \
+            --args "build"
 
   # ==========================================================
-  # TRABALHO 2: CD (Deploy)
+  # TRABALHO 2: CD - Deploy de Arquivos para GCS
+  # Objetivo: Enviar scripts de ingestão/pipelines para o GCS.
   # ==========================================================
-  deploy:
+  deploy_files:
     runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    needs: build_and_deploy_image # Garante que este deploy so ocorra apos a imagem ser atualizada
+    if: github.event_name == 'push'
     permissions:
       contents: read
-      id-token: write 
+      id-token: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        
+
       - name: Authenticate to Google Cloud
         uses: 'google-github-actions/auth@v2'
         with:
+          service_account: ${{ env.SA_EMAIL }}
           workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-          service_account: github-actions-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
 
-      # CRÍTICO: Este step DEVE vir logo após a autenticação
-      - name: Set up Cloud SDK (gcloud CLI)
+      - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
 
-      #  Opcional mas recomendado: Verificar autenticação
-      - name: Verify Authentication
+      - name: Deploy Scripts (PySpark/Pipelines) para GCS
+        # Sincroniza scripts no diretorio 'pipelines/' com o bucket de artifacts no GCS.
         run: |
-          echo "🔐 Verificando autenticação..."
-          gcloud auth list
-          echo " Testando acesso ao GCS..."
-          gsutil ls ${{ env.COMPOSER_DAGS_BUCKET }} || echo "❌ Falha ao acessar bucket"
-
-      - name: Deploy DAGs para Cloud Composer
-        run: |
-          echo " Copiando DAGs para o Composer..."
-          gsutil -m rsync -r -d airflow_home/dags/ ${{ env.COMPOSER_DAGS_BUCKET }}
-          
-      - name: Deploy Scripts PySpark para GCS
-        run: |
-          echo " Copiando scripts PySpark para Artifacts..."
+          echo "Copiando scripts de pipelines para Artifacts no GCS..."
+          # rsync -r -d: sincroniza o diretorio, deletando arquivos no destino que nao estao na origem.
+          # -x '...': Exclui metadados de ambientes Python (cache, venv).
           gsutil -m rsync -r -d \
             -x '.*__pycache__.*|.*\.pyc$|.*/venv/.*' \
             pipelines/ ${{ env.ARTIFACTS_BUCKET }}/pipelines
-          
-      - name: Deploy Projeto dbt para GCS
-        run: |
-          echo " Copiando projeto dbt para o bucket de DAGs do Composer..."
-          gsutil -m rsync -r -d \
-            -x '.*__pycache__.*|.*\.pyc$|.*/venv/.*|.*/logs/.*|.*/target/.*' \
-            dbt/ ${{ env.COMPOSER_DAGS_BUCKET }}/dbt
