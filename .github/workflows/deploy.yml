@@ -43,8 +43,9 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: "projects/123456789/locations/global/workloadIdentityPools/github/providers/github"
-          service_account: "${{ env.SA_EMAIL }}"
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: ${{ env.SA_EMAIL }}
+
       
       - name: Configure gcloud
         uses: google-github-actions/setup-gcloud@v2
