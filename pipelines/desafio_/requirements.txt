@@ -1,0 +1,5 @@
+pandas
+requests
+google-cloud-bigquery>=3.10.0
+db-dtypes>=1.2.0
+requests

@@ -1,0 +1,32 @@
+# Imagem oficial do Airflow
+FROM apache/airflow:2.9.3-python3.11
+
+# Instala os providers do Google
+RUN pip install "apache-airflow-providers-google[common,cloud-storage,google-cloud-dataproc,google-cloud-bigquery,google-cloud-run]"
+
+# Trocar para root
+USER root
+
+# (Passo importante!) Garantir que o diretório existe e com permissões
+RUN mkdir -p /var/lib/apt/lists/partial && \
+    chmod -R 755 /var/lib/apt/lists
+
+# Instalar ferramentas essenciais + gcloud CLI
+RUN apt-get update && apt-get install -y \
+    curl \
+    vim \
+    git \
+    gnupg \
+    lsb-release && \
+    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+    | tee /etc/apt/sources.list.d/google-cloud-sdk.list && \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+    | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - && \
+    apt-get update && \
+    apt-get install -y google-cloud-cli && \
+    rm -rf /var/lib/apt/lists/*
+
+# Voltar para o usuário airflow
+USER airflow
+
+ENV PATH="/home/airflow/.local/bin:${PATH}"
