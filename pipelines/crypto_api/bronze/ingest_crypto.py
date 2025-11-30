@@ -8,6 +8,7 @@ import time
 import requests
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import current_timestamp, col, to_date, year, month
+from delta.tables import DeltaTable
 
 # ============================================================================
 # CONFIGURAÇÕES
@@ -77,19 +78,45 @@ def save_to_gcs_delta(df, path: str, mode: str = "append"):
             .withColumn("year", year(col("ingestion_date")))
             .withColumn("month", month(col("ingestion_date")))
         )
-        (
-            df_partitioned.write
-            .format("delta")
-            .mode(mode)
-            .partitionBy("year", "month")
-            .option("overwriteSchema", "true")
-            .save(path)
-        )
+
+        partition_cols = ["year", "month"]
+
+        if DeltaTable.isDeltaTable(df.sparkSession, path):
+                delta_table = DeltaTable.forPath(df.sparkSession, path)
+                print("📝 Tabela Delta existente detectada. Aplicando MERGE...")
+
+                # Condição de correspondência: ID da moeda E o dia da coleta
+                merge_condition = (
+                    (delta_table.col("id") == df_partitioned.col("id")) & 
+                    (delta_table.col("ingestion_date_key") == df_partitioned.col("ingestion_date_key"))
+                )
+
+                # Executa o MERGE
+                (
+                    delta_table.merge(
+                        source=df_partitioned, 
+                        condition=merge_condition
+                    )
+                    .whenNotMatchedInsertAll() # Insere novas linhas (que não correspondem)
+                    .execute()
+                )
+        else:
+            print("🆕 Tabela Delta não encontrada. Criando a tabela inicial...")
+
+            # Cria a tabela na primeira execução
+            (
+                df_partitioned.write
+                .format("delta")
+                .mode(mode)
+                .partitionBy(*partition_cols)
+                .option("overwriteSchema", "true")
+                .save(path)
+            )
         print("✅ Dados salvos com sucesso no GCS!")
         return True
     except Exception as e:
-        print(f"❌ Erro ao salvar no GCS: {e}")
-        return False
+            print(f"❌ Erro ao salvar no GCS: {e}")
+            return False
 
 # ============================================================================
 # PIPELINE PRINCIPAL

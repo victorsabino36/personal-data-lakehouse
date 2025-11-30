@@ -11,15 +11,15 @@ DATASET_ID = 'desafio_droove'
 LOCATION = 'US' 
 
 files_to_process = {
-   # 'bitcoin':        'data/Desafio - Bitcoin.csv',
-   # 'bova11':         'data/Desafio - Bova11.csv',
-   # 'dolar':          'data/Desafio - Dolar.csv',
-   # 'ethereum':       'data/Desafio - Ethereum.csv',
+    'bitcoin':        'data/Desafio - Bitcoin.csv',
+    'bova11':         'data/Desafio - Bova11.csv',
+    'dolar':          'data/Desafio - Dolar.csv',
+    'ethereum':       'data/Desafio - Ethereum.csv',
     'indice_di':      'data/Desafio - Indice DI.csv',
-   # 'indice_ipca':    'data/Desafio - Indice IPCA.csv',
-   # 'interest_index': 'data/Desafio - Interest Index.csv',
-   # 'smal11':         'data/Desafio - Smal11.csv',
-   # 'taxa_selic':     'data/Desafio - Taxa Selic.csv'
+    'indice_ipca':    'data/Desafio - Indice IPCA.csv',
+    'interest_index': 'data/Desafio - Interest Index.csv',
+    'smal11':         'data/Desafio - Smal11.csv',
+    'taxa_selic':     'data/Desafio - Taxa Selic.csv'
 }
 
 def create_dataset_if_not_exists(client, dataset_id):
@@ -53,7 +53,6 @@ def sanitize_column_names(df):
         # Remove caracteres especiais
         clean_col = re.sub(r'[^a-z0-9_]', '', col_str)
         
-        # --- CORREÇÃO DO ERRO ---
         # Se após a limpeza o nome ficar vazio (ex: coluna era só "%"), gera um nome
         if not clean_col:
             clean_col = f"coluna_sem_nome_{i}"

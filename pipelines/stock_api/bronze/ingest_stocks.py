@@ -6,6 +6,7 @@ import requests
 from datetime import datetime
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import current_timestamp, col, to_date, year, month
+from delta.tables import DeltaTable
 
 # ============================================================================
 # CONFIGURAÇÕES
@@ -66,13 +67,53 @@ def fetch_stock_data(ticker: str) -> list:
         return []
 
 def save_to_gcs_delta(df, path: str, mode: str = "append"):
-    df_partitioned = (
-        df
-        .withColumn("ingestion_date", to_date(col("data_ingestao")))
-        .withColumn("year", year(col("ingestion_date")))
-        .withColumn("month", month(col("ingestion_date")))
-    )
-    df_partitioned.write.format("delta").mode(mode).partitionBy("ticker","year","month").option("overwriteSchema","true").save(path)
+
+    try:
+        df_partitioned = (
+            df
+            .withColumn("ingestion_date", to_date(col("data_ingestao")))
+            .withColumn("year", year(col("date")))
+            .withColumn("month", month(col("date")))
+        )
+
+        partition_cols = ["ticker","year", "month"]
+
+        # Verifica se a tabela Delta existe
+        if DeltaTable.isDeltaTable(df.sparkSession, path):
+            delta_table = DeltaTable.forPath(df.sparkSession, path)
+            print("📝 Tabela Delta existente detectada. Aplicando MERGE...")
+
+            # Condição de correspondência: Ticker E Data
+            merge_condition = (
+                (delta_table.col("ticker") == df_partitioned.col("ticker")) & 
+                (delta_table.col("date") == df_partitioned.col("date")) 
+            )
+
+            # Executa o MERGE
+            (
+                delta_table.merge(
+                    source=df_partitioned, 
+                    condition=merge_condition
+                )
+                .whenNotMatchedInsertAll() # Insere novas linhas 
+                .execute()
+            )
+
+        else:
+            print("🆕 Tabela Delta não encontrada. Criando a tabela inicial...")
+            # Cria a tabela na primeira execução
+            (
+            df_partitioned.write.format("delta")
+            .mode(mode)
+            .partitionBy("ticker","year","month")
+            .option("overwriteSchema","true")
+            .save(path)
+            )
+        print("✅ Dados salvos com sucesso no GCS!")
+        return True
+    except Exception as e:
+        print(f"❌ Erro ao salvar no GCS: {e}")
+        return False
 
 # ============================================================================
 # PIPELINE PRINCIPAL
@@ -86,13 +127,6 @@ def main():
     for ticker in STOCK_TICKERS:
         all_stock_data.extend(fetch_stock_data(ticker))
         time.sleep(15)
-
-    if not all_stock_data:
-        # fallback para dados mockados
-        all_stock_data = [
-            {"ticker": t, "date": "2025-01-01", "open": 100, "high": 110, "low": 90, "close": 105, "volume": 1000}
-            for t in STOCK_TICKERS
-        ]
 
     df = spark.createDataFrame(all_stock_data).withColumn("data_ingestao", current_timestamp())
     save_to_gcs_delta(df, GCS_BRONZE_PATH)
