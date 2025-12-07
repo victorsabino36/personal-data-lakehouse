@@ -9,9 +9,9 @@ from delta.tables import DeltaTable
 # ============================================================================
 # CONFIGURAÇÕES DA CAMADA SILVER
 # ============================================================================
-GCS_BUCKET_NAME = "date_lakehouse_bronze" 
-GCS_BRONZE_PATH = f"gs://{GCS_BUCKET_NAME}/bronze-stocks/stock_markets"
-GCS_SILVER_PATH = f"gs://{GCS_BUCKET_NAME}/silver-stocks/stocks_refined" 
+GCS_BUCKET_NAME = "personal-date-lakehouse" 
+GCS_BRONZE_PATH = f"gs://{GCS_BUCKET_NAME}/bronze/stock_favorites"
+GCS_SILVER_PATH = f"gs://{GCS_BUCKET_NAME}/silver/stock_favorites" 
 
 
 # Configurações BigQuery
@@ -197,7 +197,7 @@ def silver_main():
         df_silver = transform_to_silver(df_bronze)
         
         # 4. Gravação Incremental no Delta Lake (Silver)
-        if not write_silver_data(df_silver, GCS_SILVER_PATH, mode="append"):
+        if not write_silver_data(df_silver, GCS_SILVER_PATH, mode="overwrite"):
             raise Exception("Falha ao salvar os dados na Camada Silver (Delta Lake).")
 
         # 5. Gravação Incremental no BigQuery  

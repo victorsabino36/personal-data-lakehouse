@@ -11,8 +11,8 @@ from delta.tables import DeltaTable
 # ============================================================================
 # CONFIGURAÇÕES
 # ============================================================================
-GCS_BUCKET_NAME = "date_lakehouse_bronze"
-GCS_BRONZE_PATH = f"gs://{GCS_BUCKET_NAME}/bronze-stocks/stock_markets"
+GCS_BUCKET_NAME = "personal-date-lakehouse"
+GCS_BRONZE_PATH = f"gs://{GCS_BUCKET_NAME}/bronze/stock_favorites"
 STOCK_TICKERS = ["IBM", "MSFT", "NVDA"]
 
 try:
