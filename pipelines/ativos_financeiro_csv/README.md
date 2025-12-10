@@ -1,4 +1,4 @@
-# 📈 Projeto Data Lakehouse: Análise de Portfólio de Investimentos
+# 📈 Análise de Portfólio de Investimentos
 
 Plataforma completa de Data Engineering para ingestão, transformação e análise de dados de ativos financeiros (Renda Fixa, Variável e Cripto), resultando em um dashboard interativo para tomada de decisão e monitoramento de desempenho.
 
