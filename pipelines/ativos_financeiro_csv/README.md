@@ -30,7 +30,7 @@ O painel de controle (desenvolvido no Power BI) oferece as seguintes funcionalid
 * Distribuição percentual do portfólio por ativo.
 * Comparação do desempenho (ROI) entre diferentes classes de ativos (Renda Fixa, Ações, Cripto).
 
-[dashboards/dashboard_ativos_financeiro.png]
+**![Dashboard de Análise de Portfólio](dashboards/dashboard_ativos_financeiro.png)**
 
 ---
 **Desenvolvido por:** [Victor Sabino]
