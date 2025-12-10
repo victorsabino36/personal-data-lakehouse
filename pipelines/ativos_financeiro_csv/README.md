@@ -22,15 +22,3 @@ A pipeline de dados segue o seguinte fluxo:
 1.  **Extração (Python):** Coleta dados de APIs de mercado (IPCA, SELIC, Criptomoedas, Ações).
 2.  **Carga (BigQuery - Staging):** Os dados brutos são carregados no BigQuery (camada Bronze/Staging).
 3.  **Transformação (BigQuery - SQL):** Aplicação de regras de negócio, cálculos de rentabilidade, consolidação de portfólio e criação de tabelas dimensionais/fatos (Camada Silver e Gold).
-
-## 📊 Resultado Final: Dashboard de Portfólio
-
-O painel de controle (desenvolvido no Power BI) oferece as seguintes funcionalidades:
-* Visualização do Valor Total Investido.
-* Distribuição percentual do portfólio por ativo.
-* Comparação do desempenho (ROI) entre diferentes classes de ativos (Renda Fixa, Ações, Cripto).
-
-**![Dashboard de Análise de Portfólio](dashboards/dashboard_ativos_financeiro.png)**
-
----
-**Desenvolvido por:** [Victor Sabino]
