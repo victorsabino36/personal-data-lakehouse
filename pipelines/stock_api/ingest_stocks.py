@@ -13,8 +13,7 @@ from delta.tables import DeltaTable
 # ============================================================================
 GCS_BUCKET_NAME = "personal-date-lakehouse"
 GCS_BRONZE_PATH = f"gs://{GCS_BUCKET_NAME}/bronze/stock_favorites"
-STOCK_TICKERS = ["IBM", "MSFT", "NVDA"]
-
+STOCK_TICKERS = ["IBM", "MSFT", "NVDA", "AAPL", "OPENAI"]
 try:
     ALPHA_VANTAGE_API_KEY = sys.argv[1]
 except IndexError:
@@ -83,19 +82,15 @@ def save_to_gcs_delta(df, path: str, mode: str = "append"):
             delta_table = DeltaTable.forPath(df.sparkSession, path)
             print("📝 Tabela Delta existente detectada. Aplicando MERGE...")
 
-            # Condição de correspondência: Ticker E Data
-            merge_condition = (
-                (delta_table.col("ticker") == df_partitioned.col("ticker")) & 
-                (delta_table.col("date") == df_partitioned.col("date")) 
-            )
+            target_table = delta_table.alias("target")
+            source_df = df_partitioned.alias("source")
 
-            # Executa o MERGE
             (
-                delta_table.merge(
-                    source=df_partitioned, 
-                    condition=merge_condition
+                target_table.merge(
+                    source=source_df, 
+                    condition="target.ticker = source.ticker AND target.date = source.date"
                 )
-                .whenNotMatchedInsertAll() # Insere novas linhas 
+                .whenNotMatchedInsertAll() 
                 .execute()
             )
 
@@ -127,6 +122,11 @@ def main():
     for ticker in STOCK_TICKERS:
         all_stock_data.extend(fetch_stock_data(ticker))
         time.sleep(15)
+
+    tickers_coletados = set(item['ticker'] for item in all_stock_data)
+    print("\n🔍 Diagnóstico de Coleta:")
+    print(f"-> Tickers com dados coletados: {list(tickers_coletados)}")
+    print(f"-> Total de registros: {len(all_stock_data)}")
 
     df = spark.createDataFrame(all_stock_data).withColumn("data_ingestao", current_timestamp())
     save_to_gcs_delta(df, GCS_BRONZE_PATH)

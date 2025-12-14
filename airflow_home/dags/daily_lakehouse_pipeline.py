@@ -12,7 +12,8 @@ PROJECT_ID = "personal-data-lakehouse"
 GCP_REGION = "us-central1"
 
 ARTIFACTS_BUCKET = "personal-data-lakehouse-artifacts"
-STOCKS_SCRIPT_GCS_PATH = f"gs://{ARTIFACTS_BUCKET}/pipelines/ingest_stock_api/ingest_stocks.py"
+STOCKS_SCRIPT_GCS_PATH = f"gs://{ARTIFACTS_BUCKET}/pipelines/stock_api/ingest_stocks.py"
+TRANSFORM_SCRIPT_GCS_PATH = f"gs://{ARTIFACTS_BUCKET}/pipelines/stock_api/transforme_stock_silver.py"
 
 PYSPARK_PACKAGES = ["io.delta:delta-spark_2.13:3.2.0"] 
 
@@ -45,7 +46,7 @@ with DAG(
         project_id=PROJECT_ID,
         region=GCP_REGION,
         gcp_conn_id="google_cloud_default",
-        batch_id="ingest-stocks-{{ ds_nodash }}",
+        batch_id="ingest-stocks-{{ ds_nodash }}-{{ execution_date.strftime('%H%M%S') }}",
         batch={
             "pyspark_batch": {
                 "main_python_file_uri": STOCKS_SCRIPT_GCS_PATH,
@@ -66,23 +67,38 @@ with DAG(
         }
     )
 
-
-
-    # ============================================================
-    # TASK 3- Executar Job do Cloud Run
-    # ============================================================
-
-    task_run_dbt = CloudRunExecuteJobOperator(
-        task_id="run_dbt_models_cloud_run",
+    # TASK 2 - Transformação Silver
+    task_transform_stocks = DataprocCreateBatchOperator(
+        task_id="transform_stocks_silver_dataproc",
         project_id=PROJECT_ID,
         region=GCP_REGION,
-        job_name="dbt-runner",
         gcp_conn_id="google_cloud_default",
-        deferrable=False,
+        batch_id="transform-stocks-{{ ds_nodash }}-{{ execution_date.strftime('%H%M%S') }}",
+        batch={
+            "pyspark_batch": {
+                "main_python_file_uri": TRANSFORM_SCRIPT_GCS_PATH,
+                "args": [],
+            },
+            "runtime_config": {
+                "properties": {
+                    "spark.jars.packages": ",".join(PYSPARK_PACKAGES),
+                    "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
+                    "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+                }
+            },
+            "environment_config": {
+                "execution_config": {
+                    "service_account": DATAPROC_SERVICE_ACCOUNT
+                }
+            }
+        }
     )
+
+
+
 
     # ============================================================
     # DEPENDÊNCIAS
     # ============================================================
 
-    task_ingest_stocks >> task_run_dbt
+    task_ingest_stocks >> task_transform_stocks
